@@ -1,161 +1,155 @@
-import pygame
+import tkinter as tk
 import random
-import sys
 
-pygame.init()
+# Window settings
+WIDTH = 800
+HEIGHT = 500
+PADDLE_WIDTH = 15
+PADDLE_HEIGHT = 100
+BALL_SIZE = 20
+PADDLE_SPEED = 10
+BALL_SPEED = 6
 
-# ----------------------------
-# Settings
-# ----------------------------
-WIDTH = 600
-HEIGHT = 600
-GRID = 20
+class PongGame:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Python Pong")
 
-screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption("Snake Game")
+        self.canvas = tk.Canvas(root, width=WIDTH, height=HEIGHT, bg="black")
+        self.canvas.pack()
 
-clock = pygame.time.Clock()
+        self.left_score = 0
+        self.right_score = 0
 
-# Colors
-BG = (25, 25, 35)
-GRID_COLOR = (40, 40, 50)
-SNAKE = (0, 220, 120)
-HEAD = (0, 255, 180)
-FOOD = (255, 80, 80)
-TEXT = (255, 255, 255)
-
-font = pygame.font.SysFont("Arial", 28)
-big_font = pygame.font.SysFont("Arial", 60, bold=True)
-
-
-def random_food(snake):
-    while True:
-        x = random.randrange(0, WIDTH, GRID)
-        y = random.randrange(0, HEIGHT, GRID)
-        if (x, y) not in snake:
-            return (x, y)
-
-
-def draw_grid():
-    for x in range(0, WIDTH, GRID):
-        pygame.draw.line(screen, GRID_COLOR, (x, 0), (x, HEIGHT))
-    for y in range(0, HEIGHT, GRID):
-        pygame.draw.line(screen, GRID_COLOR, (0, y), (WIDTH, y))
-
-
-def reset_game():
-    snake = [(300, 300)]
-    direction = (GRID, 0)
-    food = random_food(snake)
-    score = 0
-    return snake, direction, food, score
-
-
-snake, direction, food, score = reset_game()
-
-running = True
-game_over = False
-
-while running:
-
-    clock.tick(10)
-
-    for event in pygame.event.get():
-
-        if event.type == pygame.QUIT:
-            running = False
-
-        if event.type == pygame.KEYDOWN:
-
-            if game_over:
-                if event.key == pygame.K_r:
-                    snake, direction, food, score = reset_game()
-                    game_over = False
-
-            else:
-                if event.key == pygame.K_UP and direction != (0, GRID):
-                    direction = (0, -GRID)
-
-                elif event.key == pygame.K_DOWN and direction != (0, -GRID):
-                    direction = (0, GRID)
-
-                elif event.key == pygame.K_LEFT and direction != (GRID, 0):
-                    direction = (-GRID, 0)
-
-                elif event.key == pygame.K_RIGHT and direction != (-GRID, 0):
-                    direction = (GRID, 0)
-
-    if not game_over:
-
-        head_x = snake[0][0] + direction[0]
-        head_y = snake[0][1] + direction[1]
-
-        new_head = (head_x, head_y)
-
-        # Wall collision
-        if (
-            head_x < 0
-            or head_x >= WIDTH
-            or head_y < 0
-            or head_y >= HEIGHT
-        ):
-            game_over = True
-
-        # Self collision
-        elif new_head in snake:
-            game_over = True
-
-        else:
-            snake.insert(0, new_head)
-
-            if new_head == food:
-                score += 1
-                food = random_food(snake)
-            else:
-                snake.pop()
-
-    # Draw
-    screen.fill(BG)
-    draw_grid()
-
-    # Food
-    pygame.draw.circle(
-        screen,
-        FOOD,
-        (food[0] + GRID // 2, food[1] + GRID // 2),
-        GRID // 2 - 2,
-    )
-
-    # Snake
-    for i, segment in enumerate(snake):
-        color = HEAD if i == 0 else SNAKE
-        pygame.draw.rect(
-            screen,
-            color,
-            (segment[0] + 1, segment[1] + 1, GRID - 2, GRID - 2),
-            border_radius=5,
+        self.score_text = self.canvas.create_text(
+            WIDTH // 2,
+            30,
+            text="0 : 0",
+            fill="white",
+            font=("Arial", 24, "bold"),
         )
 
-    score_text = font.render(f"Score : {score}", True, TEXT)
-    screen.blit(score_text, (10, 10))
-
-    if game_over:
-        overlay = pygame.Surface((WIDTH, HEIGHT))
-        overlay.set_alpha(180)
-        overlay.fill((0, 0, 0))
-        screen.blit(overlay, (0, 0))
-
-        text = big_font.render("GAME OVER", True, (255, 70, 70))
-        screen.blit(text, (110, 220))
-
-        restart = font.render(
-            "Press R to Restart",
-            True,
-            TEXT,
+        # Left paddle
+        self.left_paddle = self.canvas.create_rectangle(
+            30,
+            HEIGHT // 2 - PADDLE_HEIGHT // 2,
+            30 + PADDLE_WIDTH,
+            HEIGHT // 2 + PADDLE_HEIGHT // 2,
+            fill="white",
         )
-        screen.blit(restart, (180, 310))
 
-    pygame.display.flip()
+        # Right paddle
+        self.right_paddle = self.canvas.create_rectangle(
+            WIDTH - 30 - PADDLE_WIDTH,
+            HEIGHT // 2 - PADDLE_HEIGHT // 2,
+            WIDTH - 30,
+            HEIGHT // 2 + PADDLE_HEIGHT // 2,
+            fill="white",
+        )
 
-pygame.quit()
-sys.exit()
+        # Ball
+        self.ball = self.canvas.create_oval(
+            WIDTH // 2 - BALL_SIZE // 2,
+            HEIGHT // 2 - BALL_SIZE // 2,
+            WIDTH // 2 + BALL_SIZE // 2,
+            HEIGHT // 2 + BALL_SIZE // 2,
+            fill="white",
+        )
+
+        self.ball_dx = random.choice([-BALL_SPEED, BALL_SPEED])
+        self.ball_dy = random.choice([-BALL_SPEED, BALL_SPEED])
+
+        self.keys = set()
+
+        root.bind("<KeyPress>", self.key_press)
+        root.bind("<KeyRelease>", self.key_release)
+
+        self.game_loop()
+
+    def key_press(self, event):
+        self.keys.add(event.keysym)
+
+    def key_release(self, event):
+        self.keys.discard(event.keysym)
+
+    def move_paddles(self):
+        # Left paddle (W/S)
+        if "w" in self.keys or "W" in self.keys:
+            self.move_paddle(self.left_paddle, -PADDLE_SPEED)
+        if "s" in self.keys or "S" in self.keys:
+            self.move_paddle(self.left_paddle, PADDLE_SPEED)
+
+        # Right paddle (Up/Down)
+        if "Up" in self.keys:
+            self.move_paddle(self.right_paddle, -PADDLE_SPEED)
+        if "Down" in self.keys:
+            self.move_paddle(self.right_paddle, PADDLE_SPEED)
+
+    def move_paddle(self, paddle, dy):
+        x1, y1, x2, y2 = self.canvas.coords(paddle)
+
+        if y1 + dy >= 0 and y2 + dy <= HEIGHT:
+            self.canvas.move(paddle, 0, dy)
+
+    def move_ball(self):
+        self.canvas.move(self.ball, self.ball_dx, self.ball_dy)
+
+        bx1, by1, bx2, by2 = self.canvas.coords(self.ball)
+
+        # Bounce off top/bottom
+        if by1 <= 0 or by2 >= HEIGHT:
+            self.ball_dy *= -1
+
+        # Paddle collision
+        if self.hit_paddle(self.left_paddle):
+            self.ball_dx = abs(self.ball_dx)
+
+        if self.hit_paddle(self.right_paddle):
+            self.ball_dx = -abs(self.ball_dx)
+
+        # Score
+        if bx1 <= 0:
+            self.right_score += 1
+            self.reset_ball()
+
+        if bx2 >= WIDTH:
+            self.left_score += 1
+            self.reset_ball()
+
+    def hit_paddle(self, paddle):
+        bx1, by1, bx2, by2 = self.canvas.coords(self.ball)
+        px1, py1, px2, py2 = self.canvas.coords(paddle)
+
+        return (
+            bx2 >= px1
+            and bx1 <= px2
+            and by2 >= py1
+            and by1 <= py2
+        )
+
+    def reset_ball(self):
+        self.canvas.coords(
+            self.ball,
+            WIDTH // 2 - BALL_SIZE // 2,
+            HEIGHT // 2 - BALL_SIZE // 2,
+            WIDTH // 2 + BALL_SIZE // 2,
+            HEIGHT // 2 + BALL_SIZE // 2,
+        )
+
+        self.ball_dx = random.choice([-BALL_SPEED, BALL_SPEED])
+        self.ball_dy = random.choice([-BALL_SPEED, BALL_SPEED])
+
+        self.canvas.itemconfig(
+            self.score_text,
+            text=f"{self.left_score} : {self.right_score}",
+        )
+
+    def game_loop(self):
+        self.move_paddles()
+        self.move_ball()
+        self.root.after(16, self.game_loop)  # ~60 FPS
+
+
+root = tk.Tk()
+game = PongGame(root)
+root.mainloop()
