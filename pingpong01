@@ -1,0 +1,155 @@
+import tkinter as tk
+import random
+
+# Window settings
+WIDTH = 800
+HEIGHT = 500
+PADDLE_WIDTH = 15
+PADDLE_HEIGHT = 100
+BALL_SIZE = 20
+PADDLE_SPEED = 10
+BALL_SPEED = 6
+
+class PongGame:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Python Pong")
+
+        self.canvas = tk.Canvas(root, width=WIDTH, height=HEIGHT, bg="black")
+        self.canvas.pack()
+
+        self.left_score = 0
+        self.right_score = 0
+
+        self.score_text = self.canvas.create_text(
+            WIDTH // 2,
+            30,
+            text="0 : 0",
+            fill="white",
+            font=("Arial", 24, "bold"),
+        )
+
+        # Left paddle
+        self.left_paddle = self.canvas.create_rectangle(
+            30,
+            HEIGHT // 2 - PADDLE_HEIGHT // 2,
+            30 + PADDLE_WIDTH,
+            HEIGHT // 2 + PADDLE_HEIGHT // 2,
+            fill="white",
+        )
+
+        # Right paddle
+        self.right_paddle = self.canvas.create_rectangle(
+            WIDTH - 30 - PADDLE_WIDTH,
+            HEIGHT // 2 - PADDLE_HEIGHT // 2,
+            WIDTH - 30,
+            HEIGHT // 2 + PADDLE_HEIGHT // 2,
+            fill="white",
+        )
+
+        # Ball
+        self.ball = self.canvas.create_oval(
+            WIDTH // 2 - BALL_SIZE // 2,
+            HEIGHT // 2 - BALL_SIZE // 2,
+            WIDTH // 2 + BALL_SIZE // 2,
+            HEIGHT // 2 + BALL_SIZE // 2,
+            fill="white",
+        )
+
+        self.ball_dx = random.choice([-BALL_SPEED, BALL_SPEED])
+        self.ball_dy = random.choice([-BALL_SPEED, BALL_SPEED])
+
+        self.keys = set()
+
+        root.bind("<KeyPress>", self.key_press)
+        root.bind("<KeyRelease>", self.key_release)
+
+        self.game_loop()
+
+    def key_press(self, event):
+        self.keys.add(event.keysym)
+
+    def key_release(self, event):
+        self.keys.discard(event.keysym)
+
+    def move_paddles(self):
+        # Left paddle (W/S)
+        if "w" in self.keys or "W" in self.keys:
+            self.move_paddle(self.left_paddle, -PADDLE_SPEED)
+        if "s" in self.keys or "S" in self.keys:
+            self.move_paddle(self.left_paddle, PADDLE_SPEED)
+
+        # Right paddle (Up/Down)
+        if "Up" in self.keys:
+            self.move_paddle(self.right_paddle, -PADDLE_SPEED)
+        if "Down" in self.keys:
+            self.move_paddle(self.right_paddle, PADDLE_SPEED)
+
+    def move_paddle(self, paddle, dy):
+        x1, y1, x2, y2 = self.canvas.coords(paddle)
+
+        if y1 + dy >= 0 and y2 + dy <= HEIGHT:
+            self.canvas.move(paddle, 0, dy)
+
+    def move_ball(self):
+        self.canvas.move(self.ball, self.ball_dx, self.ball_dy)
+
+        bx1, by1, bx2, by2 = self.canvas.coords(self.ball)
+
+        # Bounce off top/bottom
+        if by1 <= 0 or by2 >= HEIGHT:
+            self.ball_dy *= -1
+
+        # Paddle collision
+        if self.hit_paddle(self.left_paddle):
+            self.ball_dx = abs(self.ball_dx)
+
+        if self.hit_paddle(self.right_paddle):
+            self.ball_dx = -abs(self.ball_dx)
+
+        # Score
+        if bx1 <= 0:
+            self.right_score += 1
+            self.reset_ball()
+
+        if bx2 >= WIDTH:
+            self.left_score += 1
+            self.reset_ball()
+
+    def hit_paddle(self, paddle):
+        bx1, by1, bx2, by2 = self.canvas.coords(self.ball)
+        px1, py1, px2, py2 = self.canvas.coords(paddle)
+
+        return (
+            bx2 >= px1
+            and bx1 <= px2
+            and by2 >= py1
+            and by1 <= py2
+        )
+
+    def reset_ball(self):
+        self.canvas.coords(
+            self.ball,
+            WIDTH // 2 - BALL_SIZE // 2,
+            HEIGHT // 2 - BALL_SIZE // 2,
+            WIDTH // 2 + BALL_SIZE // 2,
+            HEIGHT // 2 + BALL_SIZE // 2,
+        )
+
+        self.ball_dx = random.choice([-BALL_SPEED, BALL_SPEED])
+        self.ball_dy = random.choice([-BALL_SPEED, BALL_SPEED])
+
+        self.canvas.itemconfig(
+            self.score_text,
+            text=f"{self.left_score} : {self.right_score}",
+        )
+
+    def game_loop(self):
+        self.move_paddles()
+        self.move_ball()
+        self.root.after(16, self.game_loop)  # ~60 FPS
+
+
+root = tk.Tk()
+game = PongGame(root)
+root.mainloop()
